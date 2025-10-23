@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>لعبة X O - احترافية</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1a2a6c, #b21f1f, #1a2a6c);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      color: white;
+    }
+
+    .container {
+      text-align: center;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      font-size: 2.5rem;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+
+    #status {
+      font-size: 1.4rem;
+      margin: 15px 0;
+      min-height: 30px;
+      font-weight: bold;
+      color: #ffcc00;
+    }
+
+    #game-board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-gap: 8px;
+      margin: 20px auto;
+      position: relative;
+    }
+
+    .cell {
+      width: 100px;
+      height: 100px;
+      background: #2c2c2c;
+      border-radius: 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 48px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      z-index: 2;
+    }
+
+    .cell:hover {
+      background: #3a3a3a;
+      transform: scale(1.03);
+    }
+
+    .cell.x {
+      color: #ff4d4d;
+    }
+
+    .cell.o {
+      color: #4dff88;
+    }
+
+    /* خط الفوز */
+    #win-line {
+      position: absolute;
+      background: #ffcc00;
+      z-index: 1;
+      opacity: 0;
+      transform-origin: center;
+      transition: opacity 0.3s ease;
+    }
+
+    /* Modal */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+      z-index: 1000;
+    }
+
+    .modal.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-content {
+      background: linear-gradient(to bottom, #222, #444);
+      padding: 40px;
+      border-radius: 20px;
+      text-align: center;
+      max-width: 90%;
+      width: 350px;
+      box-shadow: 0 0 30px rgba(255, 204, 0, 0.6);
+    }
+
+    .modal h2 {
+      font-size: 2rem;
+      margin-bottom: 20px;
+      color: #ffcc00;
+    }
+
+    .modal p {
+      font-size: 1.4rem;
+      margin-bottom: 25px;
+      color: white;
+    }
+
+    .modal button {
+      background: #ffcc00;
+      color: #000;
+      border: none;
+      padding: 12px 30px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .modal button:hover {
+      background: #ffd740;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>لعبة X O</h1>
+    <div id="status">دور اللاعب: <span style="color:#ff4d4d">X</span></div>
+    <div id="game-board">
+      <div class="cell" data-index="0"></div>
+      <div class="cell" data-index="1"></div>
+      <div class="cell" data-index="2"></div>
+      <div class="cell" data-index="3"></div>
+      <div class="cell" data-index="4"></div>
+      <div class="cell" data-index="5"></div>
+      <div class="cell" data-index="6"></div>
+      <div class="cell" data-index="7"></div>
+      <div class="cell" data-index="8"></div>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal" id="resultModal">
+    <div class="modal-content">
+      <h2 id="modalTitle">نتيجة المباراة</h2>
+      <p id="modalMessage">لقد فاز اللاعب X!</p>
+      <button onclick="restartGame()">لعب من جديد</button>
+    </div>
+  </div>
+
+  <div id="win-line"></div>
+
+  <script>
+    let currentPlayer = 'X';
+    let gameBoard = Array(9).fill('');
+    const winningCombinations = [
+      [0,1,2], [3,4,5], [6,7,8],
+      [0,3,6], [1,4,7], [2,5,8],
+      [0,4,8], [2,4,6]
+    ];
+
+    const statusEl = document.getElementById('status');
+    const cells = document.querySelectorAll('.cell');
+    const modal = document.getElementById('resultModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalMessage = document.getElementById('modalMessage');
+    const winLineEl = document.getElementById('win-line');
+
+    function handleCellClick(e) {
+      const cell = e.target;
+      const index = parseInt(cell.getAttribute('data-index'));
+
+        if (gameBoard[index] !== '') return;
+
+      gameBoard[index] = currentPlayer;
+      cell.textContent = currentPlayer;
+      cell.classList.add(currentPlayer.toLowerCase());
+
+      if (checkWin()) {
+        const winnerCombo = getWinningCombo();
+        drawWinLine(winnerCombo);
+        showModal('فوز!', `لقد فاز اللاعب <strong style="color: ${currentPlayer === 'X' ? '#ff4d4d' : '#4dff88'}">${currentPlayer}</strong>! 🎉`);
+        return;
+      }
+
+      if (gameBoard.every(cell => cell !== '')) {
+        showModal('تعادل!', 'لم يفز أحد! 🤝');
+        return;
+      }
+
+      currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+      updateStatus();
+    }
+
+    function checkWin() {
+      return winningCombinations.some(combo => {
+        const [a, b, c] = combo;
+        return gameBoard[a] && gameBoard[a] === gameBoard[b] && gameBoard[a] === gameBoard[c];
+      });
+    }
+
+    function getWinningCombo() {
+      return winningCombinations.find(combo => {
+        const [a, b, c] = combo;
+        return gameBoard[a] && gameBoard[a] === gameBoard[b] && gameBoard[a] === gameBoard[c];
+      });
+    }
+
+    function drawWinLine(combo) {
+      const boardRect = document.getElementById('game-board').getBoundingClientRect();
+      const cellSize = 100;
+      const gap = 8;
+      const offset = boardRect.left + window.scrollX;
+      const topOffset = boardRect.top + window.scrollY;
+
+      const [a, b, c] = combo.map(i => {
+        const row = Math.floor(i / 3);
+        const col = i % 3;
+        return {
+          x: col * (cellSize + gap) + cellSize / 2,
+          y: row * (cellSize + gap) + cellSize / 2
+        };
+      });
+
+      const x1 = a.x, y1 = a.y;
+      const x2 = c.x, y2 = c.y;
+
+      const length = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+      const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+
+      winLineEl.style.width = `${length}px`;
+      winLineEl.style.height = '6px';
+      winLineEl.style.left = `${offset + x1}px`;
+      winLineEl.style.top = `${topOffset + y1}px`;
+      winLineEl.style.transform = `rotate(${angle}deg)`;
+      winLineEl.style.opacity = '1';
+    }
+
+    function updateStatus() {
+      const color = currentPlayer === 'X' ? '#ff4d4d' : '#4dff88';
+      statusEl.innerHTML = `دور اللاعب: <span style="color:${color}">${currentPlayer}</span>`;
+    }
+
+    function showModal(title, message) {
+      modalTitle.textContent = title;
+      modalMessage.innerHTML = message;
+      modal.classList.add('active');
+    }
+
+    function restartGame() {
+      currentPlayer = 'X';
+      gameBoard = Array(9).fill('');
+      cells.forEach(cell => {
+        cell.textContent = '';
+        cell.className = 'cell';
+      });
+      winLineEl.style.opacity = '0';
+      modal.classList.remove('active');
+      updateStatus();
+    }
+
+    cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+  </script>
+</body>
+</html>
