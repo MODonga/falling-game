@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>اطبخ الكشري - لعبة احترافية</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: linear-gradient(135deg, #ff4500, #ffa500, #ff6347);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      overflow: hidden;
+      position: relative;
+    }
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('https://via.placeholder.com/1920x1080/000000/ffffff?text=Kitchen+BG') no-repeat center center;
+      background-size: cover;
+      opacity: 0.1;
+      z-index: -1;
+    }
+    #score-display {
+      font-size: 28px;
+      margin-bottom: 20px;
+      font-weight: bold;
+      background: rgba(255, 255, 255, 0.9);
+      color: #333;
+      padding: 12px 28px;
+      border-radius: 20px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #score-display::before {
+      content: '🍽️';
+      font-size: 32px;
+    }
+    #game-area {
+      position: relative;
+      width: 400px;
+      height: 650px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 25px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+    }
+    #player {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90px;
+      height: 90px;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      transition: left 0.1s ease;
+      cursor: pointer;
+    }
+    .falling-plate {
+      position: absolute;
+      width: 75px;
+      height: 75px;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      top: -80px;
+      border-radius: 50%;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    .screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      text-align: center;
+      z-index: 10;
+      border-radius: 25px;
+      animation: fadeIn 0.5s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .screen button {
+      margin-top: 20px;
+      padding: 12px 28px;
+      font-size: 20px;
+      background: linear-gradient(135deg, #ffcc00, #ffdd33);
+      color: #000;
+      border: none;
+      border-radius: 15px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    .screen button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+    }
+    #leave-btn {
+      background: linear-gradient(135deg, #ff6b6b, #ff8888) !important;
+    }
+    #leave-btn:hover {
+      background: linear-gradient(135deg, #ff8888, #ffaaaa) !important;
+    }
+    #instructions {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.8);
+      text-align: center;
+    }
+    @media (max-width: 768px) {
+      #game-area {
+        width: 90vw;
+        height: 80vh;
+      }
+      #player {
+        width: 70px;
+        height: 70px;
+      }
+      .falling-plate {
+        width: 60px;
+        height: 60px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="score-display">
+    النقاط: <span id="score">0</span>
+  </div>
+  <div id="game-area">
+    <div id="player"></div>
+    
+    <!-- شاشة النهاية -->
+    <div id="game-over" class="screen" style="display: none;">
+      <div>لقد خسرت!</div>
+      <div style="font-size: 24px; margin-top: 10px;">جمعت <span id="final-score">0</span> طبق/أطباق</div>
+      <button id="restart-btn">إعادة المحاولة</button>
+    </div>
+    
+    <!-- شاشة التوقف عند مغادرة التبويب -->
+    <div id="pause-screen" class="screen" style="display: none;">
+      <div>هل تريد الاستمرار؟</div>
+      <button id="resume-btn">استئناف</button>
+      <button id="leave-btn">مغادرة</button>
+    </div>
+  </div>
+  <div id="instructions">استخدم الأسهم ← → أو اسحب باللمس للحركة</div>
+
+  <script>
+    // 🔴🟡 غيّر هذين الرابطين لصورك الخاصة (اختياري)
+    const fallingPlateImage = "2.jpg"; // طبق كشري
+    const playerImage = "1.jpg";       // اللاعب (يد/شخص)
+
+    const gameArea = document.getElementById('game-area');
+    const player = document.getElementById('player');
+    const scoreDisplay = document.getElementById('score');
+    const gameOverScreen = document.getElementById('game-over');
+    const pauseScreen = document.getElementById('pause-screen');
+    const finalScoreDisplay = document.getElementById('final-score');
+    const restartBtn = document.getElementById('restart-btn');
+    const resumeBtn = document.getElementById('resume-btn');
+    const leaveBtn = document.getElementById('leave-btn');
+
+    let score = 0;
+    let playerX = gameArea.offsetWidth / 2 - 45;
+    let gameRunning = true;
+    let paused = false;
+    let currentPlate = null;
+
+    player.style.backgroundImage = `url('${playerImage}')`;
+
+    function movePlayer(dx) {
+      if (!gameRunning || paused) return;
+      playerX += dx;
+      const maxLeft = gameArea.offsetWidth - 90;
+      playerX = Math.max(0, Math.min(playerX, maxLeft));
+      player.style.left = playerX + 'px';
+    }
+
+    function createFallingPlate() {
+      if (!gameRunning || paused || currentPlate) return;
+
+      currentPlate = document.createElement('div');
+      currentPlate.className = 'falling-plate';
+      currentPlate.style.backgroundImage = `url('${fallingPlateImage}')`;
+      currentPlate.style.left = Math.random() * (gameArea.offsetWidth - 75) + 'px';
+      currentPlate.style.top = '-80px';
+      gameArea.appendChild(currentPlate);
+
+      let speed = 1.5 + score * 0.15;
+      speed = Math.min(speed, 6);
+
+      const fall = () => {
+        if (!gameRunning || paused || !currentPlate) return;
+
+        let top = parseFloat(currentPlate.style.top);
+        top += speed;
+        currentPlate.style.top = top + 'px';
+
+        const playerRect = player.getBoundingClientRect();
+        const plateRect = currentPlate.getBoundingClientRect();
+
+        if (
+          plateRect.bottom >= playerRect.top &&
+          plateRect.right >= playerRect.left &&
+          plateRect.left <= playerRect.right &&
+          plateRect.top <= playerRect.bottom
+        ) {
+          score += 1;
+          scoreDisplay.textContent = score;
+          currentPlate.remove();
+          currentPlate = null;
+          setTimeout(createFallingPlate, Math.max(500, 1000 - score * 15));
+          return;
+        }
+
+        if (top > gameArea.offsetHeight) {
+          currentPlate.remove();
+          currentPlate = null;
+          gameOver();
+          return;
+        }
+
+        requestAnimationFrame(fall);
+      };
+
+      requestAnimationFrame(fall);
+    }
+
+    function gameOver() {
+      gameRunning = false;
+      finalScoreDisplay.textContent = score;
+      gameOverScreen.style.display = 'flex';
+    }
+
+    function pauseGame() {
+      paused = true;
+      pauseScreen.style.display = 'flex';
+    }
+
+    function resumeGame() {
+      paused = false;
+      pauseScreen.style.display = 'none';
+      if (gameRunning && !currentPlate) {
+        setTimeout(createFallingPlate, 800);
+      }
+    }
+
+    function leaveGame() {
+      gameRunning = false;
+      paused = false;
+      if (currentPlate) {
+        currentPlate.remove();
+        currentPlate = null;
+      }
+      finalScoreDisplay.textContent = score;
+      pauseScreen.style.display = 'none';
+      gameOverScreen.style.display = 'flex';
+    }
+
+    function restartGame() {
+      score = 0;
+      scoreDisplay.textContent = '0';
+      gameOverScreen.style.display = 'none';
+      gameRunning = true;
+      paused = false;
+      currentPlate = null;
+      setTimeout(createFallingPlate, 800);
+    }
+
+    // تحكم بالكيبورد
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') movePlayer(-30);
+      if (e.key === 'ArrowRight') movePlayer(30);
+    });
+
+    // تحكم باللمس
+    let touchStartX = 0;
+    gameArea.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+      e.preventDefault();
+    });
+    gameArea.addEventListener('touchmove', (e) => {
+      const diff = e.touches[0].clientX - touchStartX;
+      movePlayer(diff * 0.8);
+      touchStartX = e.touches[0].clientX;
+      e.preventDefault();
+    });
+
+    // أزرار الشاشات
+    restartBtn.addEventListener('click', restartGame);
+    resumeBtn.addEventListener('click', resumeGame);
+    leaveBtn.addEventListener('click', leaveGame);
+
+    // كشف مغادرة التبويب
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && gameRunning && !paused) {
+        if (currentPlate) {
+          currentPlate.remove();
+          currentPlate = null;
+        }
+        pauseGame();
+      }
+    });
+
+    // بدء اللعبة
+    player.style.left = playerX + 'px';
+    setTimeout(createFallingPlate, 800);
+  </script>
+</body>
+</html>
